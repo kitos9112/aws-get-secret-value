@@ -1,3 +1,6 @@
+# github.com/alyu/configparser v0.0.0-20191103060215-744e9a66e7bc
+## explicit
+github.com/alyu/configparser
 # github.com/aws/aws-sdk-go v1.35.36
 ## explicit
 github.com/aws/aws-sdk-go/aws
@@ -39,5 +42,3 @@ github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/jmespath/go-jmespath v0.4.0
 github.com/jmespath/go-jmespath
-# github.com/stretchr/testify v1.6.0
-## explicit

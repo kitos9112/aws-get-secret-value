@@ -5,109 +5,136 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"strings"
+	"os/user"
+	"path/filepath"
 
+	"github.com/alyu/configparser"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 )
 
-var config struct {
-	SecretStringsAssignments       AssignmentsMap
-	SecretBinariesAssignments      AssignmentsMap
-	SecretBinaryStringsAssignments AssignmentsMap
-	SecretJSONKeyStringAssignments AssignmentsMap
-	SecretJSONKeyAssignments       AssignmentsMap
-
-	SecretJSONKeyStrings map[string]secretJSONKey
-	SecretJSONKeys       map[string]secretJSONKey
-	PrintEnvAndExit      bool
-	PrintVersionAndExit  bool
-	Profile              string
-}
-
-var version string
-
-type secretJSONKey struct {
-	SecretID string
-	JSONKey  string
-}
-
-func init() {
-	config.SecretJSONKeyStrings = make(map[string]secretJSONKey)
-	config.SecretJSONKeys = make(map[string]secretJSONKey)
-	log.SetOutput(os.Stderr)
-	log.SetFlags(log.LstdFlags | log.Ldate)
-	log.SetPrefix("[aws-secretsmanager-env] ")
-	flag.Var(&config.SecretStringsAssignments, "secret-string", "a key/value pair `ENV_VAR=SECRET_ARN` (may be specified repeatedly)")
-	flag.Var(&config.SecretBinariesAssignments, "secret-binary-base64", "a key/value pair `ENV_VAR=SECRET_ARN` (may be specified repeatedly)")
-	flag.Var(&config.SecretBinaryStringsAssignments, "secret-binary-string", "a key/value pair `ENV_VAR=SECRET_ARN` (may be specified repeatedly)")
-	flag.Var(&config.SecretJSONKeyStringAssignments, "secret-json-key-string", "a key/value pair `ENV_VAR=SECRET_ARN#JSON_KEY` (may be specified repeatedly)")
-	flag.Var(&config.SecretJSONKeyAssignments, "secret-json-key", "a key/value pair `ENV_VAR=SECRET_ARN#JSON_KEY` (may be specified repeatedly)")
-	flag.StringVar(&config.Profile, "profile", "", "override the current AWS_PROFILE setting")
-	flag.BoolVar(&config.PrintVersionAndExit, "version", config.PrintVersionAndExit, "print version and exit")
-	flag.Parse()
-
-	config.PrintEnvAndExit = flag.NArg() > 0
-
-	for key, value := range config.SecretJSONKeyStringAssignments.Values {
-		i := strings.IndexRune(value, '#')
-		if i < 0 {
-			log.Fatalf(`"%s" must have the form SECRET_ID#JSON_KEY`, value)
-		}
-		secretID, jsonKey := value[:i], value[i+1:]
-		config.SecretJSONKeyStrings[key] = secretJSONKey{
-			SecretID: secretID,
-			JSONKey:  jsonKey,
-		}
-	}
-
-	for key, value := range config.SecretJSONKeyAssignments.Values {
-		i := strings.IndexRune(value, '#')
-		if i < 0 {
-			log.Fatalf(`"%s" must have the form SECRET_ID#JSON_KEY`, value)
-		}
-		secretID, jsonKey := value[:i], value[i+1:]
-		config.SecretJSONKeys[key] = secretJSONKey{
-			SecretID: secretID,
-			JSONKey:  jsonKey,
-		}
-	}
-}
+var sess *session.Session
+var defaultAwsRegion string = "eu-west-1"
 
 func main() {
-	if config.PrintVersionAndExit {
-		fmt.Println(version)
-		return
+	sourceProfile := flag.String("profile", "default", "AWS Profile to use")
+	secret := flag.String("secret-name", "secret", "Secret To Fetch")
+	region := flag.String("aws-region", "default", "AWS Region where to send requests to")
+	version := flag.String("secret-version", "version", "Version of secret To Fetch")
+	credFile := flag.String("credentials-file", filepath.Join(getCredentialPath(), ".aws", "credentials"), "Full path to credentials file")
+	flag.Parse()
+
+	if *secret == "secret" {
+		fmt.Printf("You must specify a secret name to fetch by setting the --secret-name CLI flag\n\nHelp:\n")
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
 
-	awsSession, err := awsSession()
-	if err != nil {
-		log.Fatalf("aws: %v", err)
+	val, regionPresent := os.LookupEnv("AWS_REGION")
+
+	if regionPresent && *region == "default" {
+		*region = val
 	}
-	secretsEnv, err := awsSecretsEnv(secretsmanager.New(awsSession))
-	if err != nil {
-		log.Fatalf("error(s) while reading secrets: %v", err)
+
+	if *sourceProfile == "default" {
+		//Use Default Credentials
+		sess = session.Must(session.NewSession(&aws.Config{
+			Region: aws.String(*region)}))
+
+	} else {
+		//Get Specified Credentials
+		exists, err := checkProfileExists(credFile, sourceProfile)
+		if err != nil || !exists {
+			fmt.Println(err.Error())
+			return
+		}
+		sess = CreateSession(sourceProfile)
 	}
-	if !config.PrintEnvAndExit {
-		for _, assignment := range secretsEnv {
-			fmt.Println(assignment)
+
+	getSecret(sess, secret, version)
+}
+
+// CreateSession Creates AWS Session with specified profile
+func CreateSession(profileName *string) *session.Session {
+	profileNameValue := *profileName
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		Profile: profileNameValue,
+	}))
+	return sess
+}
+
+// getCredentialPath returns the users home directory path as a string
+func getCredentialPath() string {
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return usr.HomeDir
+}
+
+// checkProfileExists takes path to the credentials file and profile name to search for
+// Returns bool and any errors
+func checkProfileExists(credFile *string, profileName *string) (bool, error) {
+	config, err := configparser.Read(*credFile)
+	if err != nil {
+		log.Fatal("Could not find credentials file")
+		log.Fatal(err.Error())
+		return false, err
+	}
+	section, err := config.Section(*profileName)
+	if err != nil {
+		log.Fatal("Could not find profile in credentials file")
+		return false, nil
+	}
+	if !section.Exists("aws_access_key_id") {
+		log.Fatal("Could not find access key in profile")
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func getSecret(sess *session.Session, secretName *string, secretVersion *string) {
+	svc := secretsmanager.New(sess)
+	var versionID string
+	if *secretVersion == "version" {
+		versionID = "AWSCURRENT"
+	} else {
+		versionID = *secretVersion
+	}
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId:     aws.String(*secretName),
+		VersionStage: aws.String(versionID),
+	}
+
+	result, err := svc.GetSecretValue(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case secretsmanager.ErrCodeResourceNotFoundException:
+				fmt.Println(secretsmanager.ErrCodeResourceNotFoundException)
+				log.Fatal("FATAL: Secret name --> ", *secretName, " could not be found in ", *sess.Config.Region, " region")
+			case secretsmanager.ErrCodeInvalidParameterException:
+				fmt.Println(secretsmanager.ErrCodeInvalidParameterException, aerr.Error())
+			case secretsmanager.ErrCodeInvalidRequestException:
+				fmt.Println(secretsmanager.ErrCodeInvalidRequestException, aerr.Error())
+			case secretsmanager.ErrCodeDecryptionFailure:
+				fmt.Println(secretsmanager.ErrCodeDecryptionFailure, aerr.Error())
+			case secretsmanager.ErrCodeInternalServiceError:
+				fmt.Println(secretsmanager.ErrCodeInternalServiceError, aerr.Error())
+			default:
+				fmt.Println(aerr.Error())
+			}
+		} else {
+			// Print the error, cast err to awserr.Error to get the Code and
+			// Message from an error.
+			fmt.Println(err.Error())
 		}
 		return
 	}
 
-	var osEnvAndSecretsEnv = append(os.Environ(), secretsEnv...)
-	nameAndArgs := flag.Args()
-	var args []string
-	name := nameAndArgs[0]
-	if len(nameAndArgs) > 1 {
-		args = nameAndArgs[1:]
-	}
-	cmd := exec.Command(name, args...)
-	cmd.Env = osEnvAndSecretsEnv
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Fatalf("run %v: %v", cmd.Args, err)
-	}
+	fmt.Printf("%s\n", *result.SecretString)
+
 }

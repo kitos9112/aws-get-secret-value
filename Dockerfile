@@ -1,11 +1,11 @@
-FROM golang:1.13.11-alpine3.10 AS build
-RUN apk add --no-cache make
-WORKDIR /go/src/github.com/keilerkonzept/aws-secretsmanager-env/
+FROM golang:1.15.5-alpine AS build
+RUN apk add --no-cache make jq
+WORKDIR /go/src/github.com/kitos9112/aws-get-secret-value/
 COPY . .
 ENV CGO_ENABLED=0
-RUN make binaries/linux_x86_64/aws-secretsmanager-env && mv binaries/linux_x86_64/aws-secretsmanager-env /app
+RUN make binaries/linux_x86_64/aws-get-secret-value && mv binaries/linux_x86_64/aws-get-secret-value /app
 
-FROM alpine:3.12
+FROM alpine:3.12.1
 RUN apk add --no-cache ca-certificates
-COPY --from=build /app /bin/aws-secretsmanager-env
-CMD [ "aws-secretsmanager-env" ]
+COPY --from=build /app /bin/aws-get-secret-value
+CMD [ "aws-get-secret-value" ]
