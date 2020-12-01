@@ -1,6 +1,6 @@
 # aws-get-secret-value
 
-[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/kitos9112/aws-get-secret-value.svg)](https://hub.docker.com/r/kitos9112/aws-get-secret-value/tags)
+[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/kitos9112/aws-get-secret-value.svg)](https://hub.docker.com/r/kitos9112/aws_get_secret_value/tags)
 
 Retrieves an AWS secret value as-is after given its secret name. The script can read an AWS Profile name as well as a credentials file in the CLI, otherwise it will automatically load its settings following AWS SDK standards
 
@@ -25,7 +25,7 @@ Help:
 ```
 <!-- TOC -->
 
-- [aws-get-secret-value](#app)
+- [aws-get-secret-value](#aws-get-secret-value)
   - [Get it](#get-it)
   - [Use it](#use-it)
     - [Examples](#examples)
