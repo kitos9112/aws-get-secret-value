@@ -1,6 +1,6 @@
 # aws-get-secret-value
 
-[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/kitos9112/aws-get-secret-value.svg)](https://hub.docker.com/r/kitos9112/aws-get-secret-value/tags)
+[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/kitos9112/aws-get-secret-value.svg)](https://hub.docker.com/r/kitos9112/aws_get_secret_value/tags)
 
 Retrieves an AWS secret value as-is after given its secret name. The script can read an AWS Profile name as well as a credentials file in the CLI, otherwise it will automatically load its settings following AWS SDK standards
 
@@ -44,14 +44,14 @@ Or [download the binary](https://github.com/kitos9112/aws-get-secret-value/relea
 
 ```bash
 # Linux
-curl -L https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.2/aws-get-secret-value_0.0.2_linux_x86_64.tar.gz | tar xz
+curl -L https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.3/aws-get-secret-value_0.0.3_linux_x86_64.tar.gz | tar xz
 
 # OS X
-curl -L https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.2/aws-get-secret-value_0.0.2_osx_x86_64.tar.gz | tar xz
+curl -L https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.3/aws-get-secret-value_0.0.3_osx_x86_64.tar.gz | tar xz
 
 # Windows
-curl -LO https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.2/aws-get-secret-value_0.0.2_windows_x86_64.zip
-unzip aws-get-secret-value_0.0.2_windows_x86_64.zip
+curl -LO https://github.com/kitos9112/aws-get-secret-value/releases/download/0.0.3/aws-get-secret-value_0.0.3_windows_x86_64.zip
+unzip aws-get-secret-value_0.0.3_windows_x86_64.zip
 ```
 
 ## Use it
