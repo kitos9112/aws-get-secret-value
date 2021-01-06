@@ -149,5 +149,4 @@ func getSecret(sess *session.Session, secretName *string, secretVersion *string)
 	}
 
 	fmt.Printf("%s\n", *result.SecretString)
-
 }
